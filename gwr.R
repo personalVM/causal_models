@@ -8,11 +8,110 @@
 
 # rm(list = ls())
 gc()
-source("src/util_loadPackages.R")
-source("src/fct_createDF.R")
+source("volume/etl/util_loadPackages.R")
+library(spgwr)
+library(sp)
+library(spdep)
 
 # Function ----------------------------------------------------------------
+df <- readr::read_csv("volume/causal_models/treated_df.csv") %>% 
+  dplyr::mutate(cd_micro=as.character(cd_micro))
+# View(df)
+shp <- sf::st_read(paste0("volume/data/clean_data/micro/shp/")) %>%
+  janitor::clean_names() %>%
+  mutate(across(where(is.numeric), as.character)) %>%
+  select(cd_micro) %>% 
+  sf::st_set_crs(4326)
+dfs_shp <- left_join(df, shp) %>% 
+  filter(cd_micro != 26019) %>% 
+  sf::st_sf()
+nb <- poly2nb(dfs_shp, row.names = dfs_shp$cd_micro)
+lw <- nb2listw(nb)
+print("I am Ready!")
 
+fct_centAsCols <- function(polygonx, names = c("centlat", "centlng")){
+  centroids <- do.call(rbind, sf::st_centroid(polygonx$geometry)) %>% 
+    tibble::as_tibble() %>% stats::setNames(c(names[1],names[2])) %>% dplyr::bind_cols(polygonx, ., .name_repair = "unique")
+  return(centroids)
+}
+dfs_shp <- fct_centAsCols(dfs_shp)
+dfs_shp_backup <- dfs_shp
+# any(is.na(dfs_shp))
+
+# Spatial Point DataFrame
+# formula_vars = " ~  +  +  + "
+sdp <- sp::SpatialPointsDataFrame(
+  data=data.frame(
+    ln_emig_total_pc         = dfs_shp$ln_emig_total_pc,
+    mean_salary_total        = dfs_shp$mean_salary_total,
+    ln_inhabitants_with_higherEducation_total_pc = dfs_shp$ln_inhabitants_with_higherEducation_total_pc,
+    ln_inhabitants_pkm = dfs_shp$ln_inhabitants_pkm,
+    sg_region         = dfs_shp$sg_region
+  ),
+  coords        = cbind(dfs_shp$centlng, dfs_shp$centlat)
+)
+
+formula_vars = "ln_emig_total_pc ~ mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_inhabitants_pkm + sg_region"
+# (GWRbandwidth <- spgwr::gwr.sel(
+#   formula = formula_vars,
+#   data=sdp, 
+#   method = "cv",
+#   gweight=gweight
+# ))
+# GWRbandwidth <- spgwr::gwr.sel(
+#   formula = formula_vars,
+#   data = sdp,
+#   method = "cv",
+#   gweight = gwr.bisquare()
+# )
+# print(GWRbandwidth)
+
+formula_vars <- ln_emig_total_pc ~ mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_inhabitants_pkm + sg_region
+GWRbandwidth <- spgwr::gwr.sel(
+  formula = formula_vars,
+  data = sdp,
+  method = "cv",
+  gweight = gwr.bisquare
+)
+
+# GWR model
+(gwr_model <- spgwr::gwr(
+  formula = formula_vars,
+  data = sdp, 
+  adapt = GWRbandwidth/100,
+  hatmatrix=TRUE, 
+  se.fit=TRUE
+))
+
+results <- as.data.frame(gwr_model$SDF) 
+# %>% dplyr::rename(dplyr::any_of(lookup))
+results[["cd_micro"]] <- dfs_shp[[1]]
+
+df_gwr <- dplyr::left_join(results, shp, by = "cd_micro") %>%
+  sf::st_sf(.)
+
+# dfn = df_gwr[, c("mean_salary_total", "geometry")] %>% sf::st_sf() %>% sf::st_set_crs(4326)
+# dfn = df_gwr[, c("mean_salary_total_se", "geometry")] %>% sf::st_sf() %>% sf::st_set_crs(4326)
+dfn = df_gwr %>% sf::st_sf() %>% sf::st_set_crs(4326)
+
+v=dfn$mean_salary_total_se
+v=dfn$ln_inhabitants_with_higherEducation_total_pc_se
+gg <- ggplot2::ggplot(dfn, ggplot2::aes(fill = ln_inhabitants_with_higherEducation_total_pc_se)) +
+  ggplot2::geom_sf(color = "black", size = 0.06) +
+  ggplot2::scale_fill_gradient(low = "white", high = "darkblue") +
+  ggplot2::theme_minimal() +
+  ggplot2::labs(
+    title = "",
+    fill = "..."
+  )
+gg
+print("gg")
+
+
+
+
+
+# -------
 fct_gwr <- function(
     df           = df_total,
     # formula_vars = "ICE ~ ln_HABES_pc + ln_PIB_pc + ln_EMIG_pc + ln_IMIG_pc + dist_costa + rg_"
@@ -105,9 +204,7 @@ fct_gwr <- function(
     readr::write_file(ktab_local, localTable_path)
   }
   # fct_localTable(localTable_path="volume/causal_models/table_local.html")
-  
-  
-  
+
   # Change the names of scoef 
   lookup <- c("ln_HABES_pc_scoef" = "ln_HABES_pc", 
               "ln_HABEM_pc_scoef" = "ln_HABEM_pc", 
