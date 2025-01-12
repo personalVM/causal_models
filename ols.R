@@ -36,7 +36,8 @@ source("volume/etl/util_loadPackages.R")
 
 # Load data:
 ## get treated data:
-treated_df <- readr::read_csv("volume/causal_models/treated_df.csv") %>% 
+# treated_df <- readr::read_csv("volume/causal_models/treated_df.csv") %>% 
+treated_df <- df %>% 
   dplyr::mutate(cd_micro=as.character(cd_micro))
 df = treated_df
 # treated_df$
@@ -75,5 +76,7 @@ internal_form = as.formula(paste0("ln_nao_naturais_da_unidade_da_federacao_pc  ~
 (lm_summary <- summary(lm(emig_form, data = df)))
 (lm_summary <- summary(lm(imig_form, data = df)))
 (lm_summary <- summary(lm(internal_form, data = df)))
+
+
 
 
