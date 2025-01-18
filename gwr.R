@@ -85,7 +85,7 @@ v=dfn$mean_salary_total_se
 v=dfn$ln_inhabitants_with_higherEducation_total_pc_se
 
 
-gg <- ggplot2::ggplot(dfn, ggplot2::aes(fill = ln_inhabitants_with_higherEducation_total_pc)) +
+gg <- ggplot2::ggplot(dfn, ggplot2::aes(fill = is_coastal_100km)) +
   ggplot2::geom_sf(color = "black", size = 0.06) +
   ggplot2::scale_fill_gradient(low = "white", high = "darkblue") +
   ggplot2::theme_minimal() +
