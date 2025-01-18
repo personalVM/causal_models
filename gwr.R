@@ -45,28 +45,15 @@ sdp <- sp::SpatialPointsDataFrame(
     ln_emig_total_pc         = dfs_shp$ln_emig_total_pc,
     mean_salary_total        = dfs_shp$mean_salary_total,
     ln_inhabitants_with_higherEducation_total_pc = dfs_shp$ln_inhabitants_with_higherEducation_total_pc,
-    ln_inhabitants_pkm = dfs_shp$ln_inhabitants_pkm,
-    sg_region         = dfs_shp$sg_region
+    eci_subn                 = dfs_shp$eci_subn,
+    is_coastal_100km         = dfs_shp$is_coastal_100km,
+    sg_region                = dfs_shp$sg_region
   ),
   coords        = cbind(dfs_shp$centlng, dfs_shp$centlat)
 )
 
-formula_vars = "ln_emig_total_pc ~ mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_inhabitants_pkm + sg_region"
-# (GWRbandwidth <- spgwr::gwr.sel(
-#   formula = formula_vars,
-#   data=sdp, 
-#   method = "cv",
-#   gweight=gweight
-# ))
-# GWRbandwidth <- spgwr::gwr.sel(
-#   formula = formula_vars,
-#   data = sdp,
-#   method = "cv",
-#   gweight = gwr.bisquare()
-# )
-# print(GWRbandwidth)
-
-formula_vars <- ln_emig_total_pc ~ mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_inhabitants_pkm + sg_region
+formula_vars = "ln_emig_total_pc ~ mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + eci_subn + is_coastal_100km + sg_region"
+# formula_vars <- ln_emig_total_pc ~ mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + eci_subn + is_coastal_100km + sg_region
 GWRbandwidth <- spgwr::gwr.sel(
   formula = formula_vars,
   data = sdp,
