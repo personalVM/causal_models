@@ -8,7 +8,8 @@ source("volume/etl/util_loadPackages.R")
 
 library(arrow)
 df <- read_parquet("volume/causal_models/golden_micro") %>% 
-  dplyr::filter(cd_micro != 26019)
+  dplyr::filter(cd_micro != 26019) %>% 
+  dplyr::mutate(cd_micro=as.character(cd_micro))
 
 # Logarithm transformation # TODO: add this to the ELT process:
 df$ln_emig_total_pc = log(df$emig_total_pc)
@@ -32,18 +33,19 @@ df$ln_firms_pkm = log(df$firms_total_pkm)
 df$ln_inhabitants_with_higherEducation_total_pc = log(df$inhabitants_with_higherEducation_total_pc)
 df$ln_inhabitants_with_higherEducation_total_pc = log(df$inhabitants_with_higherEducation_total_pc)
 
-rio::export(x = df, file = "volume/causal_models/treated_df.csv")
-
-
-source("volume/etl/util_loadPackages.R")
+# rio::export(x = df, file = "volume/causal_models/treated_df.csv")
+# 
+# 
+# source("volume/etl/util_loadPackages.R")
 
 # Load data:
 ## get treated data:
 # treated_df <- readr::read_csv("volume/causal_models/treated_df.csv") %>% 
-treated_df <- left_join(df_locations_munic %>% select(-c(cd_munic, nm_munic)) %>% mutate(cd_micro), df) %>% 
+dfl = df_locations_munic %>% select(-c(cd_munic, nm_munic, cd_rgime, nm_rgime, cd_rgint, nm_rgint)) %>% mutate(cd_micro=as.character(cd_micro)) %>% distinct()
+treated_df <- left_join(dfl, df) %>% 
   dplyr::mutate(cd_micro=as.character(cd_micro))
 df = treated_df
 
 
-
+indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + eci_subn + is_coastal_100km + sg_region" ### Cool!!
 
