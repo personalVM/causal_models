@@ -1,21 +1,8 @@
 library(HSAR)
 library(spatialreg)
-?HSAR::sar()
+# ?HSAR::sar()
 # install.packages("spdep")
 library(spdep)
-
-
-
-df <- df %>% 
-  mutate(cd_micro=as.character(cd_micro))
-
-# View(df)
-# df$ln_emig_total_pc
-# df$ln_immigrants_pc
-# df$ln_nao_naturais_da_unidade_da_federacao_pc
-
-
-
 
 
 shp <- sf::st_read(paste0("volume/data/clean_data/micro/shp/")) %>%
@@ -30,20 +17,6 @@ dfs_shp <- left_join(df, shp) %>%
 nb <- poly2nb(dfs_shp, row.names = dfs_shp$cd_micro)
 lw <- nb2listw(nb)
 print("I am Ready!")
-
-# neighbors <- poly2nb(your_spatial_data, queen = FALSE) 
-# weights <- nb2listw(neighbors, style = "W")
-
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + sg_region" ### Cool!!
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_inhabitants_pkm + sg_region" ### Cool!!
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + sg_region"
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_exports_pc + sg_region"
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_labor_pc + sg_region" ### Cool!!
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_firms_pc + sg_region" ### Cool!!
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_firms_pkm + sg_region" ### Cool!!
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_labor_pc + dist_coast"
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_labor_pc + is_coastal_50km" ### Cool!!
-indv = "mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + ln_labor_pc + is_coastal_50km + sg_region" ### Cool!!
 
 emig_form = as.formula(paste0("ln_emig_total_pc  ~ ", indv))
 y = dfs_shp$ln_emig_total_pc
