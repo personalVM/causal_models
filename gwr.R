@@ -331,3 +331,26 @@ fct_gwr = function(gwr_form, data, weights){
 
 
 
+# "ln_emig_pc", 
+table_gwr <- function(
+    vars_int = c("W_ln_emig_pc", "mean_salary", "ln_higherEduc_pc", "eci", "is_coastal", "region_Northeast", "region_North", "region_Southeast", "region_South", "(Intercept)"),
+    localTable_path="regression_local.html"
+){
+  # names(gwr_model$SDF@data)
+  res_int <- gwar_model$SDF@data[, vars_int] %>%
+    rename("Intercept"="(Intercept)") %>%
+    select("Intercept", everything())
+  # apply(res_int, 2, summary)
+  tab <- rbind(apply(res_int, 2, summary), coef(lm(formula = gwar_form, data = dfs_shp))) %>% as.data.frame()
+  rownames(tab)[7] <- "Global"
+  tab_local <- t(tab) %>%
+    as.data.frame(.)
+  tab_local_sap <- sapply(tab_local, function(x){round(x, 3)})
+  rownames(tab_local_sap) <- rownames(tab_local)
+  colnames(tab_local_sap) <- c("Mínimo", "1.Quartil", "Mediana", "Média", "3.Quartil", "Máximo", "Global")
+  tab_local_sap <- tab_local_sap %>% as.data.frame() %>% select(Global, dplyr::everything())
+  ktab_local <- knitr::kable(tab_local_sap, booktabs = T, format = 'html')
+  readr::write_file(ktab_local, localTable_path)
+}
+# fct_localTable(localTable_path="volume/causal_models/table_local.html")
+
