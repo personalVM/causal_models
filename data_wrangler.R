@@ -39,9 +39,9 @@ dfs_shp <- sf::st_read(paste0("volume/data/clean_data/micro/shp/")) %>%
   filter(cd_micro != 26019) %>% 
   sf::st_sf()
 
-nb <- poly2nb(dfs_shp, row.names = dfs_shp$cd_micro)
-lw <- nb2listw(nb)
-print("I am Ready!")
+# nb <- poly2nb(dfs_shp, row.names = dfs_shp$cd_micro)
+# lw <- nb2listw(nb)
+# print("I am Ready!")
 
 library(spdep)
 dfs_shp$Wy_ln_emig_total_pc <- lag.listw(lw, dfs_shp$ln_emig_total_pc)
@@ -81,7 +81,8 @@ dfs_shp=data.frame(
   is_coastal              = dfs_shp$is_coastal_10km,
   region_                 = dfs_shp$nm_region_en,
   centlat                 = dfs_shp$centlat,
-  centlng                 = dfs_shp$centlng
+  centlng                 = dfs_shp$centlng,
+  geometry                = dfs_shp$geometry
 )
 
 sdp <- sp::SpatialPointsDataFrame(
