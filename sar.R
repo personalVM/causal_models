@@ -1,63 +1,42 @@
 
 
-fct_sar = function(sar_form, data, weights){
+fct_sar = function(form, data, weights){
   
-  sar_model <- spatialreg::spautolm(sar_form, data = data, listw = weights, family = "SAR")
+  sar_model <- spatialreg::spautolm(form, data = data, listw = weights, family = "SAR")
   sar_summary <- summary(sar_model)
+
+  residuals <- sar_model$fit$residuals
+  predicted <- sar_model$fit$fitted.values
+  actual <- data[[all.vars(as.formula(form))[1]]]
+  sst <- sum((actual - mean(actual))^2)  # Total sum of squares
+  sse <- sum((actual - predicted)^2)    # Residual sum of squares
+  r_squared <- 1 - (sse / sst)
+  
+  n <- length(actual)                    # Number of observations
+  p <- length(sar_model$fit$coefficients)  # Number of predictors
+  adj_r_squared <- 1 - ((1 - r_squared) * (n - 1) / (n - p - 1))
+  
+  rmse <- sqrt(mean((actual - predicted)^2))
+  mape <- mean(abs((actual - predicted) / actual)) * 100
+  
+  data$residuals = residuals
+  data$predicted = predicted
+  
+  fct_globalMI <- function(var="gama"){
+    mi  = spdep::moran.mc(data[[var]], lw, nsim=599)$statistic %>% as.numeric(.)
+    sig = spdep::moran.mc(data[[var]], lw, nsim=599)$p.value %>% as.numeric(.)
+    return(list(mi=mi, sig=sig))
+  }
   
   return(
     list(
       model   = sar_model,
-      summary = sar_summary
+      summary = sar_summary,
+      r2 = r_squared,
+      r2adj = adj_r_squared,
+      rmse = rmse,
+      mape = mape,
+      fct_globalMI = fct_globalMI
     )
   )
 }
-
-
-
-
-# sar_form = as.formula(paste0("ln_emig_total_pc  ~ ", indv))
-# y = dfs_shp$ln_emig_total_pc
-# imig_form = as.formula(paste0("ln_immigrants_pc  ~ ", indv))
-# y = dfs_shp$ln_immigrants_pc
-# internal_form = as.formula(paste0("ln_nao_naturais_da_unidade_da_federacao_pc  ~ ", indv))
-# y = dfs_shp$ln_nao_naturais_da_unidade_da_federacao_pc
-
-
-# (emig_sar_model <- spatialreg::spautolm(emig_form, data = dfs_shp, listw = lw, family = "SAR"))
-# (imig_sar_model <- spatialreg::spautolm(imig_form, data = dfs_shp, listw = lw, family = "SAR"))
-# (internalMigration_sar_model <- spatialreg::spautolm(internal_form, data = dfs_shp, listw = lw, family = "SAR"))
-
-# (emig_sar_summary <- summary(emig_sar_model))
-# (imig_sar_summary <- summary(imig_sar_model))
-# (internalMigration_sar_summary <- summary(internalMigration_sar_model))
-
-
-# emig_sar = emig_sar_model
-# fitted_values <- fitted(sar_model)
-# residuals <- residuals(sar_model)
-# TSS <- sum((y - mean(y))^2)
-# RSS <- sum(residuals^2)
-# pseudo_r2 <- 1 - (RSS / TSS)
-# pseudo_r2
-# 
-# 
-# actual_values <- fitted_values + residuals
-# mape <- mean(abs((actual_values - fitted_values) / actual_values)) * 100
-# print(paste("MAPE:", mape))
-# 
-# 
-# residuals <- residuals(sar_model)
-# tss <- sum((dfs_shp$ln_emig_total_pc - mean(dfs_shp$ln_emig_total_pc))^2)
-# tss <- sum((dfs_shp$ln_immigrants_pc - mean(dfs_shp$ln_emig_total_pc))^2)
-# rss <- sum(residuals^2)
-# r_squared <- 1 - (rss / tss)
-# n <- length(residuals)  # Number of observations
-# k <- length(sar_model$coefficients) - 1  # Number of predictors (excluding the intercept)
-# adjusted_r_squared <- 1 - ((1 - r_squared) * (n - 1)) / (n - k - 1)
-# 
-# cat("Adjusted R-squared:", adjusted_r_squared, "\n")
-
-
-
-
