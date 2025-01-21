@@ -4,13 +4,13 @@ gc()
 source("volume/etl/util_loadPackages.R")
 
 fct_MGWR = function(
-    mgwr_form = as.formula("ln_emig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_"), 
+    form = as.formula("ln_emig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_"), 
     data, 
     fixedv = c("Intercept", "is_coastal", "region_North", "region_Northeast", "region_South", "region_Southeast")
 ){
   
   bw <- bandwidths_mgwrsar(
-    formula            = mgwr_form, 
+    formula            = form, 
     data               = data,
     coords             = as.matrix(data[,c("centlng", "centlat")]),
     fixed_vars         = fixedv,
@@ -34,7 +34,7 @@ fct_MGWR = function(
   )
   
   mgwr <- MGWRSAR(
-    formula    = mgwr_form, 
+    formula    = form, 
     data       = data,
     coords     = as.matrix(data[,c("centlng", "centlat")]), 
     fixed_vars = fixedv,
@@ -44,36 +44,45 @@ fct_MGWR = function(
     control    = list(SE=FALSE,adaptive=TRUE,W=W)
   )
   
-  mgwr_fit = mgwr$fit
-  mgwr_residuals = mgwr$residuals
-  mgwr_betav = mgwr$Betav
-  colnames(mgwr_betav) <- paste0("betav_", colnames(mgwr_betav))  
-  mgwr_betac = t(as.data.frame(mgwr$Betac))
-  colnames(mgwr_betac) <- paste0("betac_", colnames(mgwr_betac))  
+  fit = mgwr$fit
+  residuals = mgwr$residuals
+  actual <- mgwr$data[[all.vars(as.formula(form))[1]]]
+  betav = mgwr$Betav
+  colnames(betav) <- paste0("betav_", colnames(betav))  
+  betac = t(as.data.frame(mgwr$Betac))
+  colnames(betac) <- paste0("betac_", colnames(betac))  
   
-  df_mgwr <- cbind(dfs_shp, mgwr_betav, mgwr_betac, mgwr_fit, mgwr_residuals) %>%
+  df_mgwr <- cbind(dfs_shp, betav, betac, fit, residuals, actual) %>%
     sf::st_sf(.) %>% 
     sf::st_set_crs(4326)
   
+  fct_globalMI <- function(var="betav_ECI"){
+    mi  = spdep::moran.mc(df_mgwr[[var]], lw, nsim=599)$statistic %>% as.numeric(.)
+    sig = spdep::moran.mc(df_mgwr[[var]], lw, nsim=599)$p.value %>% as.numeric(.)
+    return(list(mi=mi, sig=sig))
+  }
+  
+  sst <- sum((actual - mean(actual))^2)
+  sse <- sum((actual - fit)^2)
+  r_squared <- 1 - (sse / sst)
+  n <- length(actual)
+  
+  p <- df_mgwr[, grep("beta", colnames(df_mgwr))] %>% as.data.frame() %>% select(-geometry) %>% ncol() -1
+  adj_r_squared <- 1 - ((1 - r_squared) * (n - 1) / (n - p - 1))
+  rmse <- sqrt(mean((actual - fit)^2))
+  mape <- mean(abs((actual - fit) / actual)) * 100
+  
   return(
     list(
-      df_mgwr   = df_mgwr,
-      model     = mgwr,
-      summary   = summary_mgwrsar(mgwr),
-      rmse      = mgwr$RMSE,
-      rmsen     = mgwr$RMSEn,
-      ssr       = mgwr$SSR,
-      etime     = mgwr$ctime
+      df_mgwr       = df_mgwr,
+      model         = mgwr,
+      summary       = summary_mgwrsar(mgwr),
+      rmse          = rmse,
+      r_squared     = r_squared,
+      adj_r_squared = adj_r_squared,
+      mape          = mape,
+      fct_globalMI  = fct_globalMI
     )
   )
 }
-
-# MGWRSAR <- fct_MGWRSAR(
-#     mgwar_form = as.formula("ln_emig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_"), 
-#     data       = dfs_shp, 
-#     fixedv     = c("Intercept", "is_coastal", "region_North", "region_Northeast", "region_South", "region_Southeast")
-# )
-
-# MGWRSAR
-
 
