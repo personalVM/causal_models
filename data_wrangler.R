@@ -1,5 +1,8 @@
 
 
+# rm(list = ls())
+gc()
+
 df <- read_parquet("volume/data/golden_data/micro/golden_micro") %>% 
   dplyr::filter(cd_micro != 26019) %>% 
   dplyr::mutate(cd_micro=as.character(cd_micro))
@@ -10,11 +13,14 @@ df <- left_join(df_locations_micro, df) %>%
   dplyr::filter(cd_micro != 26019)
 # df
 
+
+df$nao_naturais_da_unidade_da_federacao_pc = df$nao_naturais_da_unidade_da_federacao / df$inhabitants
+
 # Logarithm transformation # TODO: add this to the ELT process:
 df$ln_emig_total_pc = log(df$emig_total_pc)
 df$ln_immigrants_pc = log(df$immigrants_pc)
-df$ln_nao_naturais_da_unidade_da_federacao = log(df$nao_naturais_da_unidade_da_federacao)
-df$ln_nao_naturais_da_unidade_da_federacao_pc = log(df$nao_naturais_da_unidade_da_federacao / df$inhabitants)
+# df$ln_nao_naturais_da_unidade_da_federacao = log(df$nao_naturais_da_unidade_da_federacao)
+df$ln_nao_naturais_da_unidade_da_federacao_pc = log(df$nao_naturais_da_unidade_da_federacao_pc)
 df$ln_labor_total_pc = log(df$labor_total_pc)
 df$ln_labor_total_pkm = log(df$labor_total_pkm)
 df$ln_mean_salary_total = log(df$mean_salary_total)
@@ -33,20 +39,19 @@ df$ln_inhabitants_with_higherEducation_total_pc = log(df$inhabitants_with_higher
 dfs_shp <- sf::st_read(paste0("volume/data/clean_data/micro/shp/")) %>%
   janitor::clean_names() %>%
   mutate(across(where(is.numeric), as.character)) %>%
-  select(cd_micro) %>% 
-  sf::st_set_crs(4326) %>% 
-  left_join(df, .) %>% 
-  filter(cd_micro != 26019) %>% 
+  select(cd_micro) %>%
+  sf::st_set_crs(4326) %>%
+  left_join(df, .) %>%
+  filter(cd_micro != 26019) %>%
   sf::st_sf()
-
-# nb <- poly2nb(dfs_shp, row.names = dfs_shp$cd_micro)
-# lw <- nb2listw(nb)
-# print("I am Ready!")
+nb <- poly2nb(dfs_shp, row.names = dfs_shp$cd_micro)
+lw <- nb2listw(nb)
+print("I am Ready!")
 
 library(spdep)
-dfs_shp$Wy_ln_emig_total_pc <- lag.listw(lw, dfs_shp$ln_emig_total_pc)
-dfs_shp$Wy_ln_immigrants_pc <- lag.listw(lw, dfs_shp$ln_immigrants_pc)
-dfs_shp$Wy_ln_nao_naturais_da_unidade_da_federacao_pc <- lag.listw(lw, dfs_shp$ln_nao_naturais_da_unidade_da_federacao_pc)
+dfs_shp$Wy_ln_emig_total_pc <- spdep::lag.listw(lw, dfs_shp$ln_emig_total_pc)
+dfs_shp$Wy_ln_immigrants_pc <- spdep::lag.listw(lw, dfs_shp$ln_immigrants_pc)
+dfs_shp$Wy_ln_nao_naturais_da_unidade_da_federacao_pc <- spdep::lag.listw(lw, dfs_shp$ln_nao_naturais_da_unidade_da_federacao_pc)
 
 fct_centAsCols <- function(polygonx, names = c("centlat", "centlng")){
   centroids <- do.call(rbind, sf::st_centroid(polygonx$geometry)) %>% 
@@ -69,10 +74,13 @@ dfs_shp <- dfs_shp %>%
 
 dfs_shp=data.frame(
   cd_micro                = dfs_shp$cd_micro,
+  emig_pc                 = dfs_shp$emig_total_pc,
   ln_emig_pc              = dfs_shp$ln_emig_total_pc,
   w_ln_emig_pc            = dfs_shp$Wy_ln_emig_total_pc,
+  imig_pc                 = dfs_shp$immigrants_pc,
   ln_imig_pc              = dfs_shp$ln_immigrants_pc,
   w_ln_imig_pc            = dfs_shp$Wy_ln_immigrants_pc,
+  intraMig_pc             = dfs_shp$nao_naturais_da_unidade_da_federacao_pc,
   ln_intraMig_pc          = dfs_shp$ln_nao_naturais_da_unidade_da_federacao_pc,
   w_ln_intraMig_pc        = dfs_shp$Wy_ln_nao_naturais_da_unidade_da_federacao_pc,
   mean_salary             = dfs_shp$mean_salary_total,
@@ -83,10 +91,11 @@ dfs_shp=data.frame(
   centlat                 = dfs_shp$centlat,
   centlng                 = dfs_shp$centlng,
   geometry                = dfs_shp$geometry
-)
+) %>% 
+  sf::st_as_sf()
 
 sdp <- sp::SpatialPointsDataFrame(
-  dfs_shp,
+  dfs_shp %>% select(-geometry),
   coords        = cbind(dfs_shp$centlng, dfs_shp$centlat)
 )
 
