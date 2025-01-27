@@ -1,77 +1,92 @@
-# https://doi.org/10.1016/j.regsciurbeco.2017.04.001
+# R-script gwar.R
+
+# References --------------------------------------------------------------
+
+# A function to model GWAR
+
+# Setup -------------------------------------------------------------------
+
 # rm(list = ls())
 gc()
 source("volume/etl/util_loadPackages.R")
+library(spgwr)
+library(sp)
+library(spdep)
 
-fct_MGWRSAR = function(
-    form = as.formula("ln_emig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_"), 
-    data, 
-    fixedv = c("Intercept", "is_coastal", "region_North", "region_Northeast", "region_South", "region_Southeast")
-    ){
+# devtools::install_github("steibelj/gwaR", build_vignettes = TRUE)
+# gwaR::
+# spgwr::
 
-    bw <- bandwidths_mgwrsar(
-      formula            = form, 
-      data               = data,
-      coords             = as.matrix(data[,c("centlng", "centlat")]),
-      fixed_vars         = fixedv,
-      Models             = 'MGWRSAR',
-      candidates_Kernels = 'bisq',
-      control            = list(
-        NN = nrow(data), 
-        adaptive = TRUE
-      ),
-      control_search     = list()
-    )
 
-    W <- mgwrsar::kernel_matW(
-      H        = bw$MGWRSAR_bisq_adaptive$config_model$H,
-      kernels  = bw$MGWRSAR_bisq_adaptive$config_model$kernels,
-      coord_i  = as.matrix(data[, c("centlng", "centlat")]),
-      NN       = bw$MGWRSAR_bisq_adaptive$model$NN,
-      adaptive = TRUE,
-      diagnull = TRUE,
-      rowNorm  = TRUE)
-  
-    mgwar <- MGWRSAR(
-      formula    = form, 
-      data       = data,
-      coords     = as.matrix(data[,c("centlng", "centlat")]), 
-      fixed_vars = fixedv,
-      kernels    = bw$MGWRSAR_bisq_adaptive$config_model$kernels,
-      H          = bw$MGWRSAR_bisq_adaptive$config_model$H, 
-      Model      = 'MGWRSAR_1_kc_kv',
-      control    = list(SE=FALSE,adaptive=TRUE,W=W))
-    
-    mgwar_fit = mgwar$fit
-    mgwar_residuals = mgwar$residuals
-    mgwar_betav = mgwar$Betav
-    colnames(mgwar_betav) <- paste0("betav_", colnames(mgwar_betav))  
-    mgwar_betac = t(as.data.frame(mgwar$Betac))
-    colnames(mgwar_betac) <- paste0("betac_", colnames(mgwar_betac))  
-    
-    df_mgwar <- cbind(dfs_shp, mgwar_betav, mgwar_betac, mgwar_fit, mgwar_residuals) %>%
-      sf::st_sf(.) %>% 
-      sf::st_set_crs(4326)
-    
-  return(
-    list(
-      data      = mgwar$data,
-      df_mgwar  = df_mgwar,
-      model     = mgwar,
-      rmse      = mgwar$RMSE,
-      rmsen     = mgwar$RMSEn,
-      etime     = mgwar$ctime
-    )
+formula_vars = "ln_emig_pc ~ W_ln_emig_pc+ mean_salary + ln_higherEduc_pc + eci + is_coastal + region_"
+gwar_form = "ln_emig_pc ~ W_ln_emig_pc+ mean_salary + ln_higherEduc_pc + eci + is_coastal + region_"
+
+GWARbandwidth <- spgwr::gwr.sel(
+  formula = formula_vars,
+  data = sdp,
+  method = "cv",
+  gweight = gwr.bisquare
+)
+
+# GWR model
+(gwar_model <- spgwr::gwr(
+  formula = formula_vars,
+  data = sdp, 
+  adapt = GWARbandwidth/100,
+  hatmatrix=TRUE, 
+  se.fit=TRUE
+))
+
+results <- as.data.frame(gwar_model$SDF) 
+# %>% dplyr::rename(dplyr::any_of(lookup))
+results[["cd_micro"]] <- dfs_shp[[1]]
+
+df_gwar <- dplyr::left_join(results, shp, by = "cd_micro") %>%
+  sf::st_sf(.)
+
+# dfn = df_gwr[, c("mean_salary_total", "geometry")] %>% sf::st_sf() %>% sf::st_set_crs(4326)
+# dfn = df_gwr[, c("mean_salary_total_se", "geometry")] %>% sf::st_sf() %>% sf::st_set_crs(4326)
+dfn = df_gwr %>% sf::st_sf() %>% sf::st_set_crs(4326)
+
+
+# ln_emig_total_pc ~ mean_salary_total + ln_inhabitants_with_higherEducation_total_pc + eci_subn + is_coastal_100km + sg_region
+# gg <- ggplot2::ggplot(dfn, ggplot2::aes(fill = eci)) +
+gg <- ggplot2::ggplot(dfn, ggplot2::aes(fill = mean_salary)) +
+# gg <- ggplot2::ggplot(dfn, ggplot2::aes(fill = ln_popWithHigherEduc_pc)) +
+  ggplot2::geom_sf(color = "black", size = 0.06) +
+  ggplot2::scale_fill_gradient(low = "white", high = "darkblue") +
+  ggplot2::theme_minimal() +
+  ggplot2::labs(
+    title = "",
+    fill = "..."
   )
+gg
+print("gg")
+
+
+# "ln_emig_pc", 
+table_gwr <- function(
+    vars_int = c("W_ln_emig_pc", "mean_salary", "ln_higherEduc_pc", "eci", "is_coastal", "region_Northeast", "region_North", "region_Southeast", "region_South", "(Intercept)"),
+    localTable_path="regression_local.html"
+){
+  # names(gwr_model$SDF@data)
+  res_int <- gwar_model$SDF@data[, vars_int] %>%
+    rename("Intercept"="(Intercept)") %>%
+    select("Intercept", everything())
+  # apply(res_int, 2, summary)
+  tab <- rbind(apply(res_int, 2, summary), coef(lm(formula = gwar_form, data = dfs_shp))) %>% as.data.frame()
+  rownames(tab)[7] <- "Global"
+  tab_local <- t(tab) %>%
+    as.data.frame(.)
+  tab_local_sap <- sapply(tab_local, function(x){round(x, 3)})
+  rownames(tab_local_sap) <- rownames(tab_local)
+  colnames(tab_local_sap) <- c("Mínimo", "1.Quartil", "Mediana", "Média", "3.Quartil", "Máximo", "Global")
+  tab_local_sap <- tab_local_sap %>% as.data.frame() %>% select(Global, dplyr::everything())
+  ktab_local <- knitr::kable(tab_local_sap, booktabs = T, format = 'html')
+  readr::write_file(ktab_local, localTable_path)
 }
+# fct_localTable(localTable_path="volume/causal_models/table_local.html")
 
-# MGWRSAR <- fct_MGWRSAR(
-#     mgwar_form = as.formula("ln_emig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_"), 
-#     data       = dfs_shp, 
-#     fixedv     = c("Intercept", "is_coastal", "region_North", "region_Northeast", "region_South", "region_Southeast")
-# )
-
-# MGWRSAR
 
 
 
