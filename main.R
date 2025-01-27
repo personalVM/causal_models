@@ -6,11 +6,31 @@ source("volume/causal_models/util_loadPackages.R")
 source("volume/causal_models/viz_map.R")
 
 source("volume/causal_models/data_wrangler.R")
+source("volume/causal_models/viz_map2.R")
+viz_map2(data=dfs_shp %>% sf::st_as_sf(), varviz="emig_pc", titleviz="", legendviz="", paletteer=1)
+viz_map2(data=dfs_shp %>% sf::st_as_sf(), varviz="ln_emig_pc", titleviz="", legendviz="ln_emig_pc", paletteer=1)
+viz_map2(data=dfs_shp %>% sf::st_as_sf(), varviz="ln_imig_pc", titleviz="", legendviz="ln_emig_pc", paletteer=1)
+viz_map2(data=dfs_shp %>% sf::st_as_sf(), varviz="ln_intraMig_pc", titleviz="", legendviz="ln_emig_pc", paletteer=1)
+
+fct_globalMI <- function(m1var="ECI"){
+  spdep::moran.test(dfs_shp[[m1var]], listw = lw)
+  m1=spdep::moran.mc(dfs_shp[[m1var]], lw, nsim=599)$statistic %>% as.numeric(.)
+  return(m1)
+}
+fct_globalMI(m1var="emig_pc")
+fct_globalMI(m1var="imig_pc")
+fct_globalMI(m1var="intraMig_pc")
+
+fct_localMI(dfs_shp %>% sf::st_as_sf(), lw=lw, varviz="emig_pc", titleviz="", legendviz="", sig_alpha=0.35)
+fct_localMI(dfs_shp %>% sf::st_as_sf(), lw=lw, varviz="imig_pc", titleviz="", legendviz="", sig_alpha=0.35)
+fct_localMI(dfs_shp %>% sf::st_as_sf(), lw=lw, varviz="intraMig_pc", titleviz="", legendviz="", sig_alpha=0.35)
+
 
 # OLS:
 source("volume/causal_models/ols.R")
 
 emig_ols = fct_ols(form = "ln_emig_pc  ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_", dfs_shp)
+emig_ols = fct_ols(form = "ln_emig_pc  ~ w_ln_emig_pc + mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_", dfs_shp)
 emig_ols$summary
 emig_ols$R2
 emig_ols$R2adj
@@ -72,8 +92,6 @@ internalMigration_sar$fct_globalMI(var = "residuals")
 
 # GWR:
 source("volume/causal_models/gwr.R")
-# rm(emig_gwr)
-# emig_ols
 emig_gwr = fct_gwr(
   gwr_form = "ln_emig_pc  ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_",
   data = sdp,
@@ -89,10 +107,11 @@ emig_gwr$viz1(var_viz = "beta_ECI")
 emig_gwr$viz_sig(var = "ECI_sig")
 # emig_gwr$viz1(var_viz = "beta_is_coastal")
 # emig_gwr$viz_sig(var = "is_coastal_sig")
+emig_gwr$MAPE
 emig_gwr$fct_globalMI(var="residuals")
+MLmetrics::MAPE(emig_gwr$df_gwr$pred, dfs_shp$ln_emig_pc)
 emig_gwr$table(localTable_path = "volume/causal_models/tables/emig_gwr.html")
 
-imig_ols
 imig_gwr = fct_gwr(
   gwr_form = "ln_imig_pc  ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_", 
   data = sdp, 
@@ -108,9 +127,9 @@ imig_gwr$viz_sig(var = "ECI_sig")
 # imig_gwr$viz1(var_viz = "beta_is_coastal")
 # imig_gwr$viz_sig(var = "is_coastal_sig")
 imig_gwr$fct_globalMI(var="residuals")
+MLmetrics::MAPE(imig_gwr$df_gwr$pred, dfs_shp$ln_imig_pc)
 imig_gwr$table(localTable_path = "volume/causal_models/tables/imig_gwr.html")
 
-# intraMig_ols
 intraMig_gwr = fct_gwr(
   gwr_form = "ln_intraMig_pc  ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_", 
   data = sdp, 
@@ -126,6 +145,7 @@ intraMig_gwr$viz_sig(var = "ECI_sig")
 # intraMig_gwr$viz_sig(var = "is_coastal_sig")
 intraMig_gwr$fct_globalMI(var = "beta_ECI")
 intraMig_gwr$fct_globalMI(var="residuals")
+MLmetrics::MAPE(intraMig_gwr$df_gwr$pred, dfs_shp$ln_intraMig_pc)
 intraMig_gwr$table(localTable_path = "volume/causal_models/tables/intraMig_gwr.html")
 
 # GWAR:
@@ -192,10 +212,15 @@ emig_mgwar <- fct_MGWRSAR(
   fixedv = c("Intercept", "is_coastal", "region_North", "region_Northeast", "region_South", "region_Southeast")
 )
 mgwrsar::summary_mgwrsar(emig_mgwar$model)
-viz_map(data=emig_mgwar$df_mgwar, var_viz = "betav_mean_salary")
-viz_map(data=emig_mgwar$df_mgwar, var_viz = "betav_ln_higherEduc_pc")
-viz_map(data=emig_mgwar$df_mgwar, var_viz = "betav_ECI")
-viz_map(data=emig_mgwar$df_mgwar, var_viz = "betav_lambda")
+emig_mgwar$rmse
+emig_mgwar$r_squared
+emig_mgwar$adj_r_squared
+emig_mgwar$mape
+emig_mgwar$fct_globalMI(var="residuals")
+viz_map(data=emig_mgwar$df, var_viz = "betav_mean_salary")
+viz_map(data=emig_mgwar$df, var_viz = "betav_ln_higherEduc_pc")
+viz_map(data=emig_mgwar$df, var_viz = "betav_ECI")
+viz_map(data=emig_mgwar$df, var_viz = "lambda")
 
 imig_mgwar <- fct_MGWRSAR(
   form = as.formula("ln_imig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_"), 
@@ -203,10 +228,15 @@ imig_mgwar <- fct_MGWRSAR(
   fixedv = c("Intercept", "is_coastal", "region_North", "region_Northeast", "region_South", "region_Southeast")
 )
 mgwrsar::summary_mgwrsar(imig_mgwar$model)
-viz_map(data=imig_mgwar$df_mgwar, var_viz = "betav_mean_salary")
-viz_map(data=imig_mgwar$df_mgwar, var_viz = "betav_ln_higherEduc_pc")
-viz_map(data=imig_mgwar$df_mgwar, var_viz = "betav_ECI")
-viz_map(data=imig_mgwar$df_mgwar, var_viz = "betav_lambda")
+imig_mgwar$rmse
+imig_mgwar$r_squared
+imig_mgwar$adj_r_squared
+imig_mgwar$mape
+imig_mgwar$fct_globalMI(var="residuals")
+viz_map(data=imig_mgwar$df, var_viz = "betav_mean_salary")
+viz_map(data=imig_mgwar$df, var_viz = "betav_ln_higherEduc_pc")
+viz_map(data=imig_mgwar$df, var_viz = "betav_ECI")
+viz_map(data=imig_mgwar$df, var_viz = "lambda")
 
 intraMig_mgwar <- fct_MGWRSAR(
   form = as.formula("ln_intraMig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_"), 
@@ -214,10 +244,15 @@ intraMig_mgwar <- fct_MGWRSAR(
   fixedv = c("Intercept", "is_coastal", "region_North", "region_Northeast", "region_South", "region_Southeast")
 )
 mgwrsar::summary_mgwrsar(intraMig_mgwar$model)
-viz_map(data=intraMig_mgwar$df_mgwar, var_viz = "betav_mean_salary")
-viz_map(data=intraMig_mgwar$df_mgwar, var_viz = "betav_ln_higherEduc_pc")
-viz_map(data=intraMig_mgwar$df_mgwar, var_viz = "betav_ECI")
-viz_map(data=intraMig_mgwar$df_mgwar, var_viz = "betav_lambda")
+intraMig_mgwar$rmse
+intraMig_mgwar$r_squared
+intraMig_mgwar$adj_r_squared
+intraMig_mgwar$mape
+intraMig_mgwar$fct_globalMI(var="residuals")
+viz_map(data=intraMig_mgwar$df, var_viz = "betav_mean_salary")
+viz_map(data=intraMig_mgwar$df, var_viz = "betav_ln_higherEduc_pc")
+viz_map(data=intraMig_mgwar$df, var_viz = "betav_ECI")
+viz_map(data=intraMig_mgwar$df, var_viz = "lambda")
 
 
 
