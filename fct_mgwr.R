@@ -33,7 +33,7 @@ fct_MGWR = function(
     rowNorm  = TRUE
   )
   
-  mgwr <- MGWRSAR(
+  mgwr <- mgwrsar::MGWRSAR(
     formula    = form, 
     data       = data,
     coords     = as.matrix(data[,c("centlng", "centlat")]), 
@@ -43,6 +43,7 @@ fct_MGWR = function(
     Model      = 'MGWR',
     control    = list(SE=FALSE,adaptive=TRUE,W=W)
   )
+  
   
   fit = mgwr$fit
   residuals = mgwr$residuals
@@ -61,6 +62,7 @@ fct_MGWR = function(
     sig = spdep::moran.mc(df_mgwr[[var]], lw, nsim=599)$p.value %>% as.numeric(.)
     return(list(mi=mi, sig=sig))
   }
+  # fct_globalMI(var="residuals")
   
   sst <- sum((actual - mean(actual))^2)
   sse <- sum((actual - fit)^2)
