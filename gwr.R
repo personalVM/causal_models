@@ -55,7 +55,6 @@ fct_gwr = function(
   results$intercept = results$X.Intercept.
   results$intercept_se = results$X.Intercept._se
   
-  
   shp <- sf::st_read(paste0("volume/data/clean_data/micro/shp/")) %>%
     janitor::clean_names() %>%
     mutate(across(where(is.numeric), as.character)) %>%
@@ -86,8 +85,12 @@ fct_gwr = function(
     gg <- ggplot(df_gwr, aes(fill = !!sym(var_viz))) +
       geom_sf(color = "black", size = 0.06) +
       scale_fill_gradient(low = "white", high = "darkblue") +
-      theme_minimal() +
-      labs(title = paste("Visualization of", var_viz), fill = var_viz)
+      # theme_minimal() +
+      theme_void() +
+      labs(
+        # title = var_viz, 
+        fill = var_viz
+      )
     return(gg)
   }
   
@@ -120,7 +123,7 @@ fct_gwr = function(
   gwr_aicb <- gwr_model$results$AICb # GWR book's (page 61,96)
   gwr_aich <- gwr_model$results$AICh # Brunsdon AIC version
   gwr_aicc <- gwr_model$results$AICc # Hurvich, Simonoff and Tsai (1998, page 276)
-  gwr_mape <- MLmetrics::MAPE(df_gwr$pred, df_gwr$ICE)
+  gwr_mape <- "MLmetrics::MAPE(df_gwr$pred, df_gwr$ICE)"
   
 
   return(
