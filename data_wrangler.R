@@ -2,8 +2,11 @@
 
 # rm(list = ls())
 gc()
+# install.packages("HSAR")
+source("volume/causal_models/util_loadPackages.R")
 
-df <- read_parquet("volume/data/golden_data/micro/golden_micro") %>% 
+library(arrow)
+df <- arrow::read_parquet("volume/data/golden_data/micro/golden_micro") %>% 
   dplyr::filter(cd_micro != 26019) %>% 
   dplyr::mutate(cd_micro=as.character(cd_micro))
 
@@ -44,8 +47,8 @@ dfs_shp <- sf::st_read(paste0("volume/data/clean_data/micro/shp/")) %>%
   left_join(df, .) %>%
   filter(cd_micro != 26019) %>%
   sf::st_sf()
-nb <- poly2nb(dfs_shp, row.names = dfs_shp$cd_micro)
-lw <- nb2listw(nb)
+nb <- spdep::poly2nb(dfs_shp, row.names = dfs_shp$cd_micro)
+lw <- spdep::nb2listw(nb)
 print("I am Ready!")
 
 library(spdep)
@@ -71,6 +74,12 @@ dfs_shp <- dfs_shp %>%
     TRUE ~ NA_character_ # Handle unexpected values
   ))
 
+# install.packages("fastDummies")
+library("fastDummies")
+dfs_shp$region = dfs_shp$nm_region_en
+dfs_shp <- dummy_cols(dfs_shp, select_columns = "region", remove_first_dummy = FALSE)
+# form = as.formula("ln_emig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_South + region_Southeast + region_North + region_Northeast")
+
 
 dfs_shp=data.frame(
   cd_micro                = dfs_shp$cd_micro,
@@ -88,6 +97,11 @@ dfs_shp=data.frame(
   ECI                     = dfs_shp$eci_subn,
   is_coastal              = dfs_shp$is_coastal_10km,
   region_                 = dfs_shp$nm_region_en,
+  region_Midwest          = dfs_shp$region_Midwest, 
+  region_North            = dfs_shp$region_North,
+  region_Northeast        = dfs_shp$region_Northeast, 
+  region_South            = dfs_shp$region_South,
+  region_Southeast        = dfs_shp$region_Southeast,
   centlat                 = dfs_shp$centlat,
   centlng                 = dfs_shp$centlng,
   geometry                = dfs_shp$geometry
@@ -95,11 +109,11 @@ dfs_shp=data.frame(
   sf::st_as_sf()
 
 sdp <- sp::SpatialPointsDataFrame(
-  dfs_shp %>% select(-geometry),
+  dfs_shp %>% select(-geometry) %>% as.data.frame(),
   coords        = cbind(dfs_shp$centlng, dfs_shp$centlat)
 )
 
-
+# data=sdp
 
 
 
