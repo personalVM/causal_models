@@ -15,11 +15,15 @@ fct_MultiscaleGWR = function(
   # install.packages("fastDummies")
   # library("fastDummies")
   # data=dfs_shp
+  # data$region = data$sg_region
   data$region = data$region_
   data <- fastDummies::dummy_cols(data, select_columns = "region", remove_first_dummy = FALSE)
   coords=as.matrix(data[,c("centlng", "centlat")] %>% as.data.frame())
   # data
   # form = as.formula("ln_emig_pc ~ mean_salary + ln_higherEduc_pc + ECI + is_coastal + region_South + region_Southeast + region_North + region_Northeast")
+  
+  start_time <- proc.time()
+  
   mmultiscale <- mgwrsar::multiscale_gwr(
     formula=form,
     data=data,
@@ -38,13 +42,17 @@ fct_MultiscaleGWR = function(
     crit=crit
   )
   
+  end_time <- proc.time()
+  time_taken <- end_time - start_time
+  
   fit = mmultiscale$fitted %>% as.numeric()
   residuals = mmultiscale$residuals
   actual <- data[[all.vars(as.formula(form))[1]]]
+  mmultiscale$Betav
   betav = mmultiscale$Betav
   colnames(betav) <- paste0("beta_", colnames(betav))
   
-  df_mmultiscale <- cbind(dfs_shp, mmultiscale$Betav, fit, residuals, actual) %>%
+  df_mmultiscale <- cbind(dfs_shp, betav, fit, residuals, actual) %>%
     sf::st_sf(.) %>% 
     sf::st_set_crs(4326)
   
@@ -79,6 +87,7 @@ fct_MultiscaleGWR = function(
       shapiro       = mgwr_shapiro,
       skew          = mgwr_skew,
       kurt          = mgwr_kurt,
+      compTime = time_taken["elapsed"],
       fct_globalMI  = fct_globalMI
     )
   )
