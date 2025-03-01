@@ -10,6 +10,8 @@ fct_MixedGWR = function(
     fixedv = c("Intercept", "is_coastal", "region_North", "region_Northeast", "region_South", "region_Southeast")
 ){
   
+  start_time <- proc.time()
+  
   bw <- bandwidths_mgwrsar(
     formula            = form, 
     data               = data,
@@ -50,6 +52,9 @@ fct_MixedGWR = function(
     Model      = 'MGWR',
     control    = list(SE=FALSE,adaptive=TRUE,W=W)
   )
+  
+  end_time <- proc.time()
+  time_taken <- end_time - start_time
   
   fit = mgwr$fit
   residuals = mgwr$residuals
@@ -98,6 +103,7 @@ fct_MixedGWR = function(
       shapiro = mgwr_shapiro,
       skew = mgwr_skew,
       kurt = mgwr_kurt,
+      compTime = time_taken["elapsed"],
       fct_globalMI  = fct_globalMI
     )
   )
